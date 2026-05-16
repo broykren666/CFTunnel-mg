@@ -194,8 +194,29 @@ view_logs() {
     if command -v journalctl &> /dev/null; then
         $SUDO journalctl -u cloudflared -f -n 50
     else
-        echo -e "${RED}未找到 journalctl，请手动查看 /var/log/syslog 或相关日志。${NC}"
-        read -n 1 -s -r -p "按任意键继续..."
+        # 兼容 NAT VPS (如 OpenVZ/LXC) 等没有 systemd/journalctl 的情况
+        LOG_FILES=("/var/log/cloudflared.log" "/var/log/cloudflared.err" "/var/log/daemon.log" "/var/log/syslog" "/var/log/messages")
+        FOUND_LOG=""
+        for log in "${LOG_FILES[@]}"; do
+            if [[ -f "$log" ]]; then
+                FOUND_LOG="$log"
+                break
+            fi
+        done
+        
+        if [[ -n "$FOUND_LOG" ]]; then
+            echo -e "${YELLOW}未找到 journalctl，正在降级查看 $FOUND_LOG ...${NC}"
+            if [[ "$FOUND_LOG" == "/var/log/cloudflared."* ]]; then
+                $SUDO tail -f "$FOUND_LOG"
+            else
+                # 系统混合日志，需要过滤 cloudflared 关键词
+                $SUDO tail -f -n 50 "$FOUND_LOG" | grep --line-buffered -i "cloudflared"
+            fi
+        else
+            echo -e "${RED}未找到 journalctl，也未找到默认的系统日志文件。${NC}"
+            echo -e "${YELLOW}若一直连不上，可手动执行尝试：cloudflared tunnel --no-autoupdate run --token <您的Token>${NC}"
+            read -n 1 -s -r -p "按任意键继续..."
+        fi
     fi
 }
 
