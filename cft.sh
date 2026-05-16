@@ -28,6 +28,18 @@ if ! command -v curl &> /dev/null; then
     exit 1
 fi
 
+# ==========================================
+# 自动添加全局快捷命令
+# ==========================================
+SCRIPT_PATH=$(readlink -f "$0")
+if [[ "$SCRIPT_PATH" != "/usr/local/bin/cft" && -f "$SCRIPT_PATH" ]]; then
+    if $SUDO cp -f "$SCRIPT_PATH" /usr/local/bin/cft 2>/dev/null; then
+        $SUDO chmod +x /usr/local/bin/cft
+        echo -e "${GREEN}✅ 已为您创建全局快捷命令！下次可在终端任意位置直接输入 ${BLUE}cft${GREEN} 打开本面板。${NC}"
+        sleep 2
+    fi
+fi
+
 # 获取隧道状态
 get_status() {
     if ! command -v cloudflared &> /dev/null; then
