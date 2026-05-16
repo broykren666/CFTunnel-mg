@@ -95,6 +95,14 @@ update_cloudflared() {
 
 # 卸载 cloudflared
 uninstall_cloudflared() {
+    echo -e "${RED}警告：您即将完全卸载 Cloudflare Tunnel 程序并清除所有配置！${NC}"
+    read -p "是否确认执行卸载操作？[y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}已取消卸载操作。${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
+        return
+    fi
+
     echo -e "${RED}正在卸载 cloudflared...${NC}"
     if command -v cloudflared &> /dev/null; then
         echo -e "${YELLOW}正在注销系统服务...${NC}"
