@@ -119,21 +119,32 @@ uninstall_cloudflared() {
 configure_token() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}错误：请先安装 cloudflared (选项 1)${NC}"
-    else
-        echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时不会显示字符):${NC}"
-        read -s -p "> " token
-        echo "" # 换行
-        if [[ -z "$token" ]]; then
-            echo -e "${RED}Token 不能为空！${NC}"
-        else
-            echo -e "${BLUE}正在配置隧道服务...${NC}"
-            if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
-                echo -e "${YELLOW}检测到已有隧道服务，正在覆盖配置...${NC}"
-                $SUDO cloudflared service uninstall 2>/dev/null
-            fi
-            $SUDO cloudflared service install "$token"
-            echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
+        return
+    fi
+
+    if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
+        echo -e "${YELLOW}警告：检测到系统已配置了 Cloudflare Tunnel 服务。${NC}"
+        read -p "继续操作将覆盖现有配置并重启服务。是否确认继续？[y/N]: " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}已取消操作。${NC}"
+            read -n 1 -s -r -p "按任意键继续..."
+            return
         fi
+    fi
+
+    echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时不会显示字符):${NC}"
+    read -s -p "> " token
+    echo "" # 换行
+    if [[ -z "$token" ]]; then
+        echo -e "${RED}Token 不能为空！${NC}"
+    else
+        echo -e "${BLUE}正在配置隧道服务...${NC}"
+        if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
+            $SUDO cloudflared service uninstall 2>/dev/null
+        fi
+        $SUDO cloudflared service install "$token"
+        echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
