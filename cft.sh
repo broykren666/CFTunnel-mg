@@ -149,6 +149,30 @@ uninstall_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
+# 配置并启动隧道服务
+configure_token() {
+    if ! command -v cloudflared &> /dev/null; then
+        echo -e "${RED}错误：请先安装 cloudflared (选项 1)${NC}"
+    else
+        echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token:${NC}"
+        read -p "> " token
+        if [[ -z "$token" ]]; then
+            echo -e "${RED}Token 不能为空！${NC}"
+        else
+            echo -e "${BLUE}正在配置隧道服务...${NC}"
+            if [[ "$CURRENT_OS" == "Windows" ]]; then
+                # Windows 下安装服务并启动
+                cloudflared service install "$token"
+            else
+                # Linux/macOS 下安装服务
+                $SUDO cloudflared service install "$token"
+            fi
+            echo -e "${GREEN}配置尝试完成！请检查上方输出确认是否成功。${NC}"
+        fi
+    fi
+    read -n 1 -s -r -p "按任意键继续..."
+}
+
 # 主菜单
 while true; do
     clear
@@ -161,13 +185,15 @@ while true; do
     echo " 1. 安装 cloudflared"
     echo " 2. 更新 cloudflared"
     echo " 3. 卸载 cloudflared"
+    echo " 4. 配置 Token 并启动服务"
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
-    read -p " 请选择一个选项 [0-3]: " choice
+    read -p " 请选择一个选项 [0-4]: " choice
     case $choice in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
         3) uninstall_cloudflared ;;
+        4) configure_token ;;
         0) clear; exit 0 ;;
         *) echo -e "${RED}无效选项！${NC}"; sleep 1 ;;
     esac
