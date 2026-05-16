@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Cloudflare Tunnel (cloudflared) 管理脚本
-# Designed for Windows (Git Bash), Linux, and macOS
+# Designed for Linux
 
 # 颜色设置
 RED='\033[0;31m'
@@ -10,23 +10,9 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # 无颜色
 
-# 自动检测系统
-detect_os() {
-    case "$(uname -s)" in
-        Linux*)     OS=Linux;;
-        Darwin*)    OS=macOS;;
-        MINGW*)     OS=Windows;;
-        MSYS*)      OS=Windows;;
-        *)          OS="UNKNOWN:${unameOut}"
-    esac
-    echo $OS
-}
-
-CURRENT_OS=$(detect_os)
-
 # 检测 sudo 可用性
 SUDO=""
-if command -v sudo &> /dev/null && [[ "$CURRENT_OS" != "Windows" ]]; then
+if command -v sudo &> /dev/null; then
     SUDO="sudo"
 fi
 
@@ -37,76 +23,33 @@ get_status() {
         return
     fi
 
-    if [[ "$CURRENT_OS" == "Windows" ]]; then
-        if sc.exe query cloudflared 2>/dev/null | grep -q "RUNNING"; then
-            echo -e "${GREEN}运行中 (服务)${NC}"
-        else
-            echo -e "${YELLOW}已停止 / 无服务${NC}"
-        fi
-    elif [[ "$CURRENT_OS" == "Linux" ]]; then
-        if command -v systemctl &> /dev/null && systemctl is-active --quiet cloudflared 2>/dev/null; then
-            echo -e "${GREEN}运行中 (服务)${NC}"
-        elif pgrep -x "cloudflared" > /dev/null; then
-            echo -e "${GREEN}运行中 (进程)${NC}"
-        else
-            echo -e "${YELLOW}已停止${NC}"
-        fi
+    if command -v systemctl &> /dev/null && systemctl is-active --quiet cloudflared 2>/dev/null; then
+        echo -e "${GREEN}运行中 (服务)${NC}"
+    elif pgrep -x "cloudflared" > /dev/null; then
+        echo -e "${GREEN}运行中 (进程)${NC}"
     else
-        if pgrep -x "cloudflared" > /dev/null; then
-            echo -e "${GREEN}运行中${NC}"
-        else
-            echo -e "${YELLOW}已停止${NC}"
-        fi
+        echo -e "${YELLOW}已停止${NC}"
     fi
 }
 
 # 安装 cloudflared
 install_cloudflared() {
     echo -e "${BLUE}正在安装 cloudflared...${NC}"
-    case "$CURRENT_OS" in
-        Windows)
-            if command -v winget &> /dev/null; then
-                winget install --id Cloudflare.cloudflared
-            else
-                echo -e "${YELLOW}未找到 winget，正在下载二进制文件...${NC}"
-                curl -L -o cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
-                echo -e "${YELLOW}cloudflared.exe 已下载到当前目录。${NC}"
-            fi
-            ;;
-        Linux)
-            ARCH=$(uname -m)
-            if [[ "$ARCH" == "x86_64" ]]; then
-                FILE="cloudflared-linux-amd64"
-            elif [[ "$ARCH" == "aarch64" ]]; then
-                FILE="cloudflared-linux-arm64"
-            else
-                FILE="cloudflared-linux-386"
-            fi
-            curl -L -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/$FILE
-            chmod +x cloudflared
-            if [[ -n "$SUDO" ]]; then
-                $SUDO mv cloudflared /usr/local/bin/
-            else
-                mv cloudflared $HOME/bin/ 2>/dev/null || mv cloudflared /usr/local/bin/
-            fi
-            ;;
-        macOS)
-            if command -v brew &> /dev/null; then
-                brew install cloudflare/cloudflare/cloudflared
-            else
-                echo -e "${YELLOW}未找到 Homebrew，正在下载二进制文件...${NC}"
-                curl -L -o cloudflared.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
-                tar -xzf cloudflared.tgz
-                chmod +x cloudflared
-                if [[ -n "$SUDO" ]]; then
-                    $SUDO mv cloudflared /usr/local/bin/
-                else
-                    mv cloudflared /usr/local/bin/
-                fi
-                rm cloudflared.tgz
-            fi
-            ;;
-    esac
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "x86_64" ]]; then
+        FILE="cloudflared-linux-amd64"
+    elif [[ "$ARCH" == "aarch64" ]]; then
+        FILE="cloudflared-linux-arm64"
+    else
+        FILE="cloudflared-linux-386"
+    fi
+    curl -L -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/$FILE
+    chmod +x cloudflared
+    if [[ -n "$SUDO" ]]; then
+        $SUDO mv cloudflared /usr/local/bin/
+    else
+        mv cloudflared $HOME/bin/ 2>/dev/null || mv cloudflared /usr/local/bin/
+    fi
     echo -e "${GREEN}安装尝试完成！${NC}"
     echo -e "${YELLOW}提示：软件已安装。接下来请执行菜单 [选项 4] 来配置您的 Token 并启用隧道服务。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
@@ -118,11 +61,7 @@ update_cloudflared() {
         echo -e "${RED}未安装 cloudflared。${NC}"
     else
         echo -e "${BLUE}正在更新 cloudflared...${NC}"
-        if [[ "$CURRENT_OS" == "Windows" ]]; then
-            cloudflared update
-        else
-            $SUDO cloudflared update
-        fi
+        $SUDO cloudflared update
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -130,22 +69,11 @@ update_cloudflared() {
 # 卸载 cloudflared
 uninstall_cloudflared() {
     echo -e "${RED}正在卸载 cloudflared...${NC}"
-    case "$CURRENT_OS" in
-        Windows)
-            if command -v winget &> /dev/null; then
-                winget uninstall --id Cloudflare.cloudflared
-            else
-                echo -e "${YELLOW}请手动删除二进制文件。${NC}"
-            fi
-            ;;
-        Linux|macOS)
-            if [[ -n "$SUDO" ]]; then
-                $SUDO rm /usr/local/bin/cloudflared
-            else
-                rm /usr/local/bin/cloudflared
-            fi
-            ;;
-    esac
+    if [[ -n "$SUDO" ]]; then
+        $SUDO rm /usr/local/bin/cloudflared
+    else
+        rm /usr/local/bin/cloudflared
+    fi
     echo -e "${GREEN}卸载完成！${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -162,11 +90,7 @@ configure_token() {
             echo -e "${RED}Token 不能为空！${NC}"
         else
             echo -e "${BLUE}正在配置隧道服务...${NC}"
-            if [[ "$CURRENT_OS" == "Windows" ]]; then
-                cloudflared service install "$token"
-            else
-                $SUDO cloudflared service install "$token"
-            fi
+            $SUDO cloudflared service install "$token"
             echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
         fi
     fi
@@ -190,27 +114,13 @@ manage_service() {
 
     case $s_choice in
         1)
-            if [[ "$CURRENT_OS" == "Windows" ]]; then
-                sc.exe start cloudflared
-            else
-                $SUDO systemctl start cloudflared
-            fi
+            $SUDO systemctl start cloudflared
             ;;
         2)
-            if [[ "$CURRENT_OS" == "Windows" ]]; then
-                sc.exe stop cloudflared
-            else
-                $SUDO systemctl stop cloudflared
-            fi
+            $SUDO systemctl stop cloudflared
             ;;
         3)
-            if [[ "$CURRENT_OS" == "Windows" ]]; then
-                sc.exe stop cloudflared
-                sleep 2
-                sc.exe start cloudflared
-            else
-                $SUDO systemctl restart cloudflared
-            fi
+            $SUDO systemctl restart cloudflared
             ;;
         *) return ;;
     esac
@@ -221,26 +131,10 @@ manage_service() {
 # 查看运行日志
 view_logs() {
     echo -e "${BLUE}正在调取实时日志 (按 Ctrl+C 退出)...${NC}"
-    if [[ "$CURRENT_OS" == "Windows" ]]; then
-        # Windows 尝试从默认路径读取日志，如果不存在则提示用户查看事件查看器
-        LOG_PATH="$LOCALAPPDATA/cloudflared/cloudflared.log"
-        if [[ -f "$LOG_PATH" ]]; then
-            tail -f "$LOG_PATH"
-        else
-            echo -e "${YELLOW}未找到默认日志文件。Windows 服务日志通常记录在“事件查看器”中。${NC}"
-            echo -e "${YELLOW}或者您可以手动运行以下命令查看输出：${NC}"
-            echo -e "cloudflared tunnel run --token <您的TOKEN>"
-            read -n 1 -s -r -p "按任意键继续..."
-        fi
-    elif [[ "$CURRENT_OS" == "Linux" ]]; then
-        if command -v journalctl &> /dev/null; then
-            $SUDO journalctl -u cloudflared -f -n 50
-        else
-            echo -e "${RED}未找到 journalctl，请手动查看 /var/log/syslog 或相关日志。${NC}"
-            read -n 1 -s -r -p "按任意键继续..."
-        fi
+    if command -v journalctl &> /dev/null; then
+        $SUDO journalctl -u cloudflared -f -n 50
     else
-        echo -e "${YELLOW}macOS 请查看相关系统日志。${NC}"
+        echo -e "${RED}未找到 journalctl，请手动查看 /var/log/syslog 或相关日志。${NC}"
         read -n 1 -s -r -p "按任意键继续..."
     fi
 }
