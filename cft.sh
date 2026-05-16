@@ -131,8 +131,16 @@ configure_token() {
         return
     fi
 
+    # 兼容检查：是否已有配置的服务或正在运行的进程
+    SERVICE_EXISTS=false
     if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
-        echo -e "${YELLOW}警告：检测到系统已配置了 Cloudflare Tunnel 服务。${NC}"
+        SERVICE_EXISTS=true
+    elif [[ -f "/etc/init.d/cloudflared" ]] || pgrep -x "cloudflared" > /dev/null; then
+        SERVICE_EXISTS=true
+    fi
+
+    if [[ "$SERVICE_EXISTS" == true ]]; then
+        echo -e "${YELLOW}警告：检测到系统已配置了 Cloudflare Tunnel 服务或有正在运行的进程。${NC}"
         read -p "继续操作将覆盖现有配置并重启服务。是否确认继续？[y/N]: " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo -e "${BLUE}已取消操作。${NC}"
@@ -148,8 +156,9 @@ configure_token() {
         echo -e "${RED}Token 不能为空！${NC}"
     else
         echo -e "${BLUE}正在配置隧道服务...${NC}"
-        if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
+        if [[ "$SERVICE_EXISTS" == true ]]; then
             $SUDO cloudflared service uninstall 2>/dev/null
+            $SUDO pkill -x cloudflared 2>/dev/null # 确保彻底杀死残留旧进程
         fi
         $SUDO cloudflared service install "$token"
         echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
