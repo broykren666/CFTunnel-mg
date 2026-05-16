@@ -251,7 +251,7 @@ while true; do
     echo "======================================================"
     echo "          Cloudflare Tunnel 隧道管理脚本"
     echo "------------------------------------------------------"
-    echo -e " 系统类型: ${BLUE}$CURRENT_OS${NC} | 当前状态: $STATUS"
+    echo -e " 系统类型: ${BLUE}$CURRENT_OS${NC} | 服务状态: $STATUS"
     echo "======================================================"
     echo " 1. 安装 cloudflared"
     echo " 2. 更新 cloudflared"
