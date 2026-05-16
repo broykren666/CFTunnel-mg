@@ -108,6 +108,7 @@ install_cloudflared() {
             ;;
     esac
     echo -e "${GREEN}安装尝试完成！${NC}"
+    echo -e "${YELLOW}提示：软件已安装。接下来请执行菜单 [选项 4] 来配置您的 Token 并启用隧道服务。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
 
