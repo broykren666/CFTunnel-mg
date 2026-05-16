@@ -149,28 +149,99 @@ uninstall_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# 配置并启动隧道服务
+# 配置并启动隧道服务 (Token 输入加密)
 configure_token() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}错误：请先安装 cloudflared (选项 1)${NC}"
     else
-        echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token:${NC}"
-        read -p "> " token
+        echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时不会显示字符):${NC}"
+        read -s -p "> " token
+        echo "" # 换行
         if [[ -z "$token" ]]; then
             echo -e "${RED}Token 不能为空！${NC}"
         else
             echo -e "${BLUE}正在配置隧道服务...${NC}"
             if [[ "$CURRENT_OS" == "Windows" ]]; then
-                # Windows 下安装服务并启动
                 cloudflared service install "$token"
             else
-                # Linux/macOS 下安装服务
                 $SUDO cloudflared service install "$token"
             fi
-            echo -e "${GREEN}配置尝试完成！请检查上方输出确认是否成功。${NC}"
+            echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
         fi
     fi
     read -n 1 -s -r -p "按任意键继续..."
+}
+
+# 服务管理 (启动/停止/重启)
+manage_service() {
+    if ! command -v cloudflared &> /dev/null; then
+        echo -e "${RED}错误：请先安装 cloudflared${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
+        return
+    fi
+
+    echo -e "${BLUE}--- 服务管理 ---${NC}"
+    echo " 1. 启动服务"
+    echo " 2. 停止服务"
+    echo " 3. 重启服务"
+    echo " 0. 返回主菜单"
+    read -p " 请选择 [0-3]: " s_choice
+
+    case $s_choice in
+        1)
+            if [[ "$CURRENT_OS" == "Windows" ]]; then
+                sc.exe start cloudflared
+            else
+                $SUDO systemctl start cloudflared
+            fi
+            ;;
+        2)
+            if [[ "$CURRENT_OS" == "Windows" ]]; then
+                sc.exe stop cloudflared
+            else
+                $SUDO systemctl stop cloudflared
+            fi
+            ;;
+        3)
+            if [[ "$CURRENT_OS" == "Windows" ]]; then
+                sc.exe stop cloudflared
+                sleep 2
+                sc.exe start cloudflared
+            else
+                $SUDO systemctl restart cloudflared
+            fi
+            ;;
+        *) return ;;
+    esac
+    echo -e "${GREEN}操作已执行。${NC}"
+    read -n 1 -s -r -p "按任意键继续..."
+}
+
+# 查看运行日志
+view_logs() {
+    echo -e "${BLUE}正在调取实时日志 (按 Ctrl+C 退出)...${NC}"
+    if [[ "$CURRENT_OS" == "Windows" ]]; then
+        # Windows 尝试从默认路径读取日志，如果不存在则提示用户查看事件查看器
+        LOG_PATH="$LOCALAPPDATA/cloudflared/cloudflared.log"
+        if [[ -f "$LOG_PATH" ]]; then
+            tail -f "$LOG_PATH"
+        else
+            echo -e "${YELLOW}未找到默认日志文件。Windows 服务日志通常记录在“事件查看器”中。${NC}"
+            echo -e "${YELLOW}或者您可以手动运行以下命令查看输出：${NC}"
+            echo -e "cloudflared tunnel run --token <您的TOKEN>"
+            read -n 1 -s -r -p "按任意键继续..."
+        fi
+    elif [[ "$CURRENT_OS" == "Linux" ]]; then
+        if command -v journalctl &> /dev/null; then
+            $SUDO journalctl -u cloudflared -f -n 50
+        else
+            echo -e "${RED}未找到 journalctl，请手动查看 /var/log/syslog 或相关日志。${NC}"
+            read -n 1 -s -r -p "按任意键继续..."
+        fi
+    else
+        echo -e "${YELLOW}macOS 请查看相关系统日志。${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
+    fi
 }
 
 # 主菜单
@@ -186,14 +257,18 @@ while true; do
     echo " 2. 更新 cloudflared"
     echo " 3. 卸载 cloudflared"
     echo " 4. 配置 Token 并启动服务"
+    echo " 5. 服务控制 (启动/停止/重启)"
+    echo " 6. 查看实时运行日志"
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
-    read -p " 请选择一个选项 [0-4]: " choice
+    read -p " 请选择一个选项 [0-6]: " choice
     case $choice in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
         3) uninstall_cloudflared ;;
         4) configure_token ;;
+        5) manage_service ;;
+        6) view_logs ;;
         0) clear; exit 0 ;;
         *) echo -e "${RED}无效选项！${NC}"; sleep 1 ;;
     esac
