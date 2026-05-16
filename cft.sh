@@ -34,48 +34,47 @@ fi
 # Get Tunnel Status
 get_status() {
     if ! command -v cloudflared &> /dev/null; then
-        echo -e "${RED}Not Installed${NC}"
+        echo -e "${RED}未安装${NC}"
         return
     fi
 
     if [[ "$CURRENT_OS" == "Windows" ]]; then
         # Check Windows Service status using sc.exe
         if sc.exe query cloudflared 2>/dev/null | grep -q "RUNNING"; then
-            echo -e "${GREEN}Running (Service)${NC}"
+            echo -e "${GREEN}运行中 (服务)${NC}"
         else
-            echo -e "${YELLOW}Stopped / No Service${NC}"
+            echo -e "${YELLOW}已停止 / 无服务${NC}"
         fi
     elif [[ "$CURRENT_OS" == "Linux" ]]; then
         if command -v systemctl &> /dev/null && systemctl is-active --quiet cloudflared 2>/dev/null; then
-            echo -e "${GREEN}Running (Service)${NC}"
+            echo -e "${GREEN}运行中 (服务)${NC}"
         elif pgrep -x "cloudflared" > /dev/null; then
-            echo -e "${GREEN}Running (Process)${NC}"
+            echo -e "${GREEN}运行中 (进程)${NC}"
         else
-            echo -e "${YELLOW}Stopped${NC}"
+            echo -e "${YELLOW}已停止${NC}"
         fi
     else
         # For macOS or others
         if pgrep -x "cloudflared" > /dev/null; then
-            echo -e "${GREEN}Running${NC}"
+            echo -e "${GREEN}运行中${NC}"
         else
-            echo -e "${YELLOW}Stopped${NC}"
+            echo -e "${YELLOW}已停止${NC}"
         fi
     fi
 }
 
 # Install cloudflared
 install_cloudflared() {
-    echo -e "${BLUE}Installing cloudflared...${NC}"
+    echo -e "${BLUE}正在安装 cloudflared...${NC}"
     case "$CURRENT_OS" in
         Windows)
             if command -v winget &> /dev/null; then
                 winget install --id Cloudflare.cloudflared
             else
-                echo -e "${YELLOW}winget not found. Downloading binary...${NC}"
+                echo -e "${YELLOW}未找到 winget，正在下载二进制文件...${NC}"
                 curl -L -o cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
-                # Move to a directory in PATH if possible, or keep it local
-                echo -e "${YELLOW}Downloaded cloudflared.exe to current directory.${NC}"
-                echo -e "${YELLOW}Please move it to a folder in your PATH manually if winget is unavailable.${NC}"
+                echo -e "${YELLOW}cloudflared.exe 已下载到当前目录。${NC}"
+                echo -e "${YELLOW}如果 winget 不可用，请手动将此文件移动到 PATH 路径下的文件夹中。${NC}"
             fi
             ;;
         Linux)
@@ -100,7 +99,7 @@ install_cloudflared() {
             if command -v brew &> /dev/null; then
                 brew install cloudflare/cloudflare/cloudflared
             else
-                echo -e "${YELLOW}Homebrew not found. Downloading binary...${NC}"
+                echo -e "${YELLOW}未找到 Homebrew，正在下载二进制文件...${NC}"
                 curl -L -o cloudflared.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
                 tar -xzf cloudflared.tgz
                 chmod +x cloudflared
@@ -113,34 +112,34 @@ install_cloudflared() {
             fi
             ;;
     esac
-    echo -e "${GREEN}Installation attempt complete!${NC}"
-    read -n 1 -s -r -p "Press any key to continue..."
+    echo -e "${GREEN}安装尝试完成！${NC}"
+    read -n 1 -s -r -p "按任意键继续..."
 }
 
 # Update cloudflared
 update_cloudflared() {
     if ! command -v cloudflared &> /dev/null; then
-        echo -e "${RED}cloudflared is not installed.${NC}"
+        echo -e "${RED}未安装 cloudflared。${NC}"
     else
-        echo -e "${BLUE}Updating cloudflared...${NC}"
+        echo -e "${BLUE}正在更新 cloudflared...${NC}"
         if [[ "$CURRENT_OS" == "Windows" ]]; then
             cloudflared update
         else
             $SUDO cloudflared update
         fi
     fi
-    read -n 1 -s -r -p "Press any key to continue..."
+    read -n 1 -s -r -p "按任意键继续..."
 }
 
 # Uninstall cloudflared
 uninstall_cloudflared() {
-    echo -e "${RED}Uninstalling cloudflared...${NC}"
+    echo -e "${RED}正在卸载 cloudflared...${NC}"
     case "$CURRENT_OS" in
         Windows)
             if command -v winget &> /dev/null; then
                 winget uninstall --id Cloudflare.cloudflared
             else
-                echo -e "${YELLOW}Please uninstall Cloudflare Tunnel via Control Panel or delete the binary.${NC}"
+                echo -e "${YELLOW}请通过控制面板卸载 Cloudflare Tunnel 或手动删除二进制文件。${NC}"
             fi
             ;;
         Linux|macOS)
@@ -151,8 +150,8 @@ uninstall_cloudflared() {
             fi
             ;;
     esac
-    echo -e "${GREEN}Uninstallation complete!${NC}"
-    read -n 1 -s -r -p "Press any key to continue..."
+    echo -e "${GREEN}卸载完成！${NC}"
+    read -n 1 -s -r -p "按任意键继续..."
 }
 
 # Add Shortcut Command 'cft'
@@ -183,18 +182,18 @@ add_shortcut() {
         if grep -q "alias cft=" "$SHELL_RC" 2>/dev/null; then
             # Update existing alias
             sed -i "s|alias cft=.*|alias cft='bash $SCRIPT_PATH'|" "$SHELL_RC"
-            echo -e "${GREEN}Shortcut 'cft' updated in $SHELL_RC${NC}"
+            echo -e "${GREEN}快捷命令 'cft' 已在 $SHELL_RC 中更新${NC}"
         else
             echo "" >> "$SHELL_RC"
             echo "alias cft='bash $SCRIPT_PATH'" >> "$SHELL_RC"
-            echo -e "${GREEN}Shortcut 'cft' added to $SHELL_RC${NC}"
+            echo -e "${GREEN}快捷命令 'cft' 已添加到 $SHELL_RC${NC}"
         fi
-        echo -e "${BLUE}Please restart your shell or run: source $SHELL_RC${NC}"
+        echo -e "${BLUE}请重启 Shell 或运行: source $SHELL_RC${NC}"
     else
-        echo -e "${RED}Could not detect shell configuration file. Please add this manually:${NC}"
+        echo -e "${RED}未能检测到 Shell 配置文件。请手动添加此行：${NC}"
         echo -e "${YELLOW}alias cft='bash $SCRIPT_PATH'${NC}"
     fi
-    read -n 1 -s -r -p "Press any key to continue..."
+    read -n 1 -s -r -p "按任意键继续..."
 }
 
 # Main Menu
@@ -202,17 +201,17 @@ while true; do
     clear
     STATUS=$(get_status)
     echo "======================================================"
-    echo "      Cloudflare Tunnel Management Script"
+    echo "          Cloudflare Tunnel 隧道管理脚本"
     echo "------------------------------------------------------"
-    echo -e " System: ${BLUE}$CURRENT_OS${NC} | Status: $STATUS"
+    echo -e " 系统类型: ${BLUE}$CURRENT_OS${NC} | 当前状态: $STATUS"
     echo "======================================================"
-    echo " 1. Install cloudflared"
-    echo " 2. Update cloudflared"
-    echo " 3. Uninstall cloudflared"
-    echo " 4. Add 'cft' shortcut command"
-    echo " 0. Exit"
+    echo " 1. 安装 cloudflared"
+    echo " 2. 更新 cloudflared"
+    echo " 3. 卸载 cloudflared"
+    echo " 4. 添加 'cft' 快捷命令"
+    echo " 0. 退出脚本"
     echo "------------------------------------------------------"
-    read -p " Select an option [0-4]: " choice
+    read -p " 请选择一个选项 [0-4]: " choice
 
     case $choice in
         1) install_cloudflared ;;
@@ -220,6 +219,6 @@ while true; do
         3) uninstall_cloudflared ;;
         4) add_shortcut ;;
         0) clear; exit 0 ;;
-        *) echo -e "${RED}Invalid option!${NC}"; sleep 1 ;;
+        *) echo -e "${RED}无效选项！${NC}"; sleep 1 ;;
     esac
 done
