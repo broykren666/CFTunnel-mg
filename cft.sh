@@ -149,41 +149,6 @@ uninstall_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# 添加快捷命令 'cft'
-add_shortcut() {
-    SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-    SHELL_RC=""
-    if [[ "$SHELL" == *"zsh"* ]]; then
-        SHELL_RC="$HOME/.zshrc"
-    elif [[ "$SHELL" == *"bash"* ]]; then
-        if [[ "$CURRENT_OS" == "Windows" ]]; then
-            if [[ -f "$HOME/.bash_profile" ]]; then
-                SHELL_RC="$HOME/.bash_profile"
-            elif [[ -f "$HOME/.bashrc" ]]; then
-                SHELL_RC="$HOME/.bashrc"
-            else
-                SHELL_RC="$HOME/.bash_profile"
-            fi
-        else
-            SHELL_RC="$HOME/.bashrc"
-        fi
-    fi
-    if [[ -n "$SHELL_RC" ]]; then
-        if grep -q "alias cft=" "$SHELL_RC" 2>/dev/null; then
-            sed -i "s|alias cft=.*|alias cft='bash $SCRIPT_PATH'|" "$SHELL_RC"
-            echo -e "${GREEN}快捷命令 'cft' 已在 $SHELL_RC 中更新${NC}"
-        else
-            echo "" >> "$SHELL_RC"
-            echo "alias cft='bash $SCRIPT_PATH'" >> "$SHELL_RC"
-            echo -e "${GREEN}快捷命令 'cft' 已添加到 $SHELL_RC${NC}"
-        fi
-        echo -e "${BLUE}请重启 Shell 或运行: source $SHELL_RC${NC}"
-    else
-        echo -e "${RED}未能检测到 Shell 配置文件。请手动添加：alias cft='bash $SCRIPT_PATH'${NC}"
-    fi
-    read -n 1 -s -r -p "按任意键继续..."
-}
-
 # 主菜单
 while true; do
     clear
@@ -196,15 +161,13 @@ while true; do
     echo " 1. 安装 cloudflared"
     echo " 2. 更新 cloudflared"
     echo " 3. 卸载 cloudflared"
-    echo " 4. 添加 'cft' 快捷命令"
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
-    read -p " 请选择一个选项 [0-4]: " choice
+    read -p " 请选择一个选项 [0-3]: " choice
     case $choice in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
         3) uninstall_cloudflared ;;
-        4) add_shortcut ;;
         0) clear; exit 0 ;;
         *) echo -e "${RED}无效选项！${NC}"; sleep 1 ;;
     esac
