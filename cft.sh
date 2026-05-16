@@ -16,6 +16,18 @@ if command -v sudo &> /dev/null; then
     SUDO="sudo"
 fi
 
+# 检测权限
+if [[ "$EUID" -ne 0 && -z "$SUDO" ]]; then
+    echo -e "${RED}错误：请使用 root 用户运行此脚本，或确保已安装 sudo。${NC}"
+    exit 1
+fi
+
+# 检测必需工具
+if ! command -v curl &> /dev/null; then
+    echo -e "${RED}错误：未找到 curl，请先执行相应的包管理器命令 (如 apt/yum install curl) 安装。${NC}"
+    exit 1
+fi
+
 # 获取隧道状态
 get_status() {
     if ! command -v cloudflared &> /dev/null; then
@@ -43,7 +55,10 @@ install_cloudflared() {
     else
         FILE="cloudflared-linux-386"
     fi
-    curl -L -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/$FILE
+    if ! curl -L -o cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/$FILE"; then
+        echo -e "${RED}下载失败！请检查服务器网络能否访问 Github。${NC}"
+        return
+    fi
     chmod +x cloudflared
     if [[ -n "$SUDO" ]]; then
         $SUDO mv cloudflared /usr/local/bin/
@@ -69,12 +84,22 @@ update_cloudflared() {
 # 卸载 cloudflared
 uninstall_cloudflared() {
     echo -e "${RED}正在卸载 cloudflared...${NC}"
-    if [[ -n "$SUDO" ]]; then
-        $SUDO rm /usr/local/bin/cloudflared
-    else
-        rm /usr/local/bin/cloudflared
+    if command -v cloudflared &> /dev/null; then
+        echo -e "${YELLOW}正在注销系统服务...${NC}"
+        $SUDO cloudflared service uninstall 2>/dev/null
+        if command -v systemctl &> /dev/null; then
+            $SUDO systemctl daemon-reload
+        fi
     fi
-    echo -e "${GREEN}卸载完成！${NC}"
+    
+    if [[ -n "$SUDO" ]]; then
+        $SUDO rm -f /usr/local/bin/cloudflared
+        $SUDO rm -rf /etc/cloudflared
+    else
+        rm -f /usr/local/bin/cloudflared
+        rm -rf /etc/cloudflared
+    fi
+    echo -e "${GREEN}卸载完成！程序和相关配置已清理。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
 
@@ -90,6 +115,10 @@ configure_token() {
             echo -e "${RED}Token 不能为空！${NC}"
         else
             echo -e "${BLUE}正在配置隧道服务...${NC}"
+            if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
+                echo -e "${YELLOW}检测到已有隧道服务，正在覆盖配置...${NC}"
+                $SUDO cloudflared service uninstall 2>/dev/null
+            fi
             $SUDO cloudflared service install "$token"
             echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
         fi
