@@ -199,6 +199,35 @@ view_logs() {
     fi
 }
 
+# 更新管理脚本
+update_script() {
+    echo -e "${BLUE}正在从 GitHub 获取最新版管理脚本...${NC}"
+    SCRIPT_URL="https://raw.githubusercontent.com/broykren666/CFTunnel-mg/refs/heads/main/cft.sh"
+    
+    TMP_FILE=$(mktemp)
+    if ! curl -sL -o "$TMP_FILE" "$SCRIPT_URL"; then
+        echo -e "${RED}下载失败！请检查服务器网络能否访问 Github。${NC}"
+        rm -f "$TMP_FILE"
+        read -n 1 -s -r -p "按任意键继续..."
+        return
+    fi
+    
+    SCRIPT_PATH=$(readlink -f "$0")
+    $SUDO cp -f "$TMP_FILE" "$SCRIPT_PATH"
+    $SUDO chmod +x "$SCRIPT_PATH"
+    rm -f "$TMP_FILE"
+    
+    if [[ -f "/usr/local/bin/cft" && "$SCRIPT_PATH" != "/usr/local/bin/cft" ]]; then
+        $SUDO cp -f "$SCRIPT_PATH" /usr/local/bin/cft
+        $SUDO chmod +x /usr/local/bin/cft
+    fi
+    
+    echo -e "${GREEN}✅ 管理脚本已成功更新到最新版本！${NC}"
+    echo -e "${YELLOW}自动重启生效...${NC}"
+    sleep 1
+    exec "$SCRIPT_PATH"
+}
+
 # 主菜单
 while true; do
     clear
@@ -214,9 +243,10 @@ while true; do
     echo " 4. 配置 Token 并启动服务"
     echo " 5. 服务控制 (启动/停止/重启)"
     echo " 6. 查看实时运行日志"
+    echo " 7. 更新管理脚本"
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
-    read -p " 请选择一个选项 [0-6]: " choice
+    read -p " 请选择一个选项 [0-7]: " choice
     case $choice in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
@@ -224,6 +254,7 @@ while true; do
         4) configure_token ;;
         5) manage_service ;;
         6) view_logs ;;
+        7) update_script ;;
         0) clear; exit 0 ;;
         *) echo -e "${RED}无效选项！${NC}"; sleep 1 ;;
     esac
