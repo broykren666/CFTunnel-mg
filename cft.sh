@@ -1,17 +1,16 @@
 #!/bin/bash
 
-# Cloudflare Tunnel (cloudflared) Management Script
+# Cloudflare Tunnel (cloudflared) 管理脚本
 # Designed for Windows (Git Bash), Linux, and macOS
 
-# Ensure we are using LF line endings
-# Set colors
+# 颜色设置
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
-# Detect System
+# 自动检测系统
 detect_os() {
     case "$(uname -s)" in
         Linux*)     OS=Linux;;
@@ -25,13 +24,13 @@ detect_os() {
 
 CURRENT_OS=$(detect_os)
 
-# Detect sudo availability
+# 检测 sudo 可用性
 SUDO=""
 if command -v sudo &> /dev/null && [[ "$CURRENT_OS" != "Windows" ]]; then
     SUDO="sudo"
 fi
 
-# Get Tunnel Status
+# 获取隧道状态
 get_status() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}未安装${NC}"
@@ -39,7 +38,6 @@ get_status() {
     fi
 
     if [[ "$CURRENT_OS" == "Windows" ]]; then
-        # Check Windows Service status using sc.exe
         if sc.exe query cloudflared 2>/dev/null | grep -q "RUNNING"; then
             echo -e "${GREEN}运行中 (服务)${NC}"
         else
@@ -54,7 +52,6 @@ get_status() {
             echo -e "${YELLOW}已停止${NC}"
         fi
     else
-        # For macOS or others
         if pgrep -x "cloudflared" > /dev/null; then
             echo -e "${GREEN}运行中${NC}"
         else
@@ -63,7 +60,7 @@ get_status() {
     fi
 }
 
-# Install cloudflared
+# 安装 cloudflared
 install_cloudflared() {
     echo -e "${BLUE}正在安装 cloudflared...${NC}"
     case "$CURRENT_OS" in
@@ -74,11 +71,9 @@ install_cloudflared() {
                 echo -e "${YELLOW}未找到 winget，正在下载二进制文件...${NC}"
                 curl -L -o cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
                 echo -e "${YELLOW}cloudflared.exe 已下载到当前目录。${NC}"
-                echo -e "${YELLOW}如果 winget 不可用，请手动将此文件移动到 PATH 路径下的文件夹中。${NC}"
             fi
             ;;
         Linux)
-            # Detect architecture
             ARCH=$(uname -m)
             if [[ "$ARCH" == "x86_64" ]]; then
                 FILE="cloudflared-linux-amd64"
@@ -116,7 +111,7 @@ install_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# Update cloudflared
+# 更新 cloudflared
 update_cloudflared() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}未安装 cloudflared。${NC}"
@@ -131,7 +126,7 @@ update_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# Uninstall cloudflared
+# 卸载 cloudflared
 uninstall_cloudflared() {
     echo -e "${RED}正在卸载 cloudflared...${NC}"
     case "$CURRENT_OS" in
@@ -139,7 +134,7 @@ uninstall_cloudflared() {
             if command -v winget &> /dev/null; then
                 winget uninstall --id Cloudflare.cloudflared
             else
-                echo -e "${YELLOW}请通过控制面板卸载 Cloudflare Tunnel 或手动删除二进制文件。${NC}"
+                echo -e "${YELLOW}请手动删除二进制文件。${NC}"
             fi
             ;;
         Linux|macOS)
@@ -154,17 +149,14 @@ uninstall_cloudflared() {
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# Add Shortcut Command 'cft'
+# 添加快捷命令 'cft'
 add_shortcut() {
-    # Get absolute path of the script
     SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
     SHELL_RC=""
-    
     if [[ "$SHELL" == *"zsh"* ]]; then
         SHELL_RC="$HOME/.zshrc"
     elif [[ "$SHELL" == *"bash"* ]]; then
         if [[ "$CURRENT_OS" == "Windows" ]]; then
-            # Check for common bash config files in Git Bash
             if [[ -f "$HOME/.bash_profile" ]]; then
                 SHELL_RC="$HOME/.bash_profile"
             elif [[ -f "$HOME/.bashrc" ]]; then
@@ -176,11 +168,8 @@ add_shortcut() {
             SHELL_RC="$HOME/.bashrc"
         fi
     fi
-
     if [[ -n "$SHELL_RC" ]]; then
-        # Check if alias already exists
         if grep -q "alias cft=" "$SHELL_RC" 2>/dev/null; then
-            # Update existing alias
             sed -i "s|alias cft=.*|alias cft='bash $SCRIPT_PATH'|" "$SHELL_RC"
             echo -e "${GREEN}快捷命令 'cft' 已在 $SHELL_RC 中更新${NC}"
         else
@@ -190,13 +179,12 @@ add_shortcut() {
         fi
         echo -e "${BLUE}请重启 Shell 或运行: source $SHELL_RC${NC}"
     else
-        echo -e "${RED}未能检测到 Shell 配置文件。请手动添加此行：${NC}"
-        echo -e "${YELLOW}alias cft='bash $SCRIPT_PATH'${NC}"
+        echo -e "${RED}未能检测到 Shell 配置文件。请手动添加：alias cft='bash $SCRIPT_PATH'${NC}"
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# Main Menu
+# 主菜单
 while true; do
     clear
     STATUS=$(get_status)
@@ -212,7 +200,6 @@ while true; do
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
     read -p " 请选择一个选项 [0-4]: " choice
-
     case $choice in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
