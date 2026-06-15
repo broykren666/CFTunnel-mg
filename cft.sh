@@ -3,6 +3,9 @@
 # Cloudflare Tunnel (cloudflared) 管理脚本
 # Designed for Linux
 
+# 脚本配置
+SCRIPT_URL="https://raw.githubusercontent.com/broykren666/CFTunnel-mg/refs/heads/main/cft.sh"
+
 # 颜色设置
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -117,7 +120,7 @@ uninstall_cloudflared() {
     read -p "是否确认执行卸载操作？[y/N]: " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo -e "${BLUE}已取消卸载操作。${NC}"
-        read -n 1 -s -r -p "按任意键继续..."
+        read -n 1 -s -r -p "按任意键 continue..."
         return
     fi
 
@@ -130,8 +133,18 @@ uninstall_cloudflared() {
         fi
     fi
     
+    # 彻底清理进程
+    if command -v pkill &> /dev/null; then
+        "$SUDO" pkill -9 -x cloudflared 2>/dev/null
+    else
+        "$SUDO" kill -9 $(pgrep -x cloudflared) 2>/dev/null
+    fi
+
+    # 清理程序和所有可能的配置目录
     "$SUDO" rm -f /usr/local/bin/cloudflared
     "$SUDO" rm -rf /etc/cloudflared
+    rm -rf "$HOME/.cloudflared" # 增加用户家目录清理
+    
     echo -e "${GREEN}卸载完成！程序和相关配置已清理。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -171,7 +184,11 @@ configure_token() {
         echo -e "${BLUE}正在配置隧道服务...${NC}"
         # 先清理旧服务确保安装成功
         "$SUDO" cloudflared service uninstall 2>/dev/null
-        "$SUDO" pkill -x cloudflared 2>/dev/null
+        if command -v pkill &> /dev/null; then
+            "$SUDO" pkill -9 -x cloudflared 2>/dev/null
+        else
+            "$SUDO" kill -9 $(pgrep -x cloudflared) 2>/dev/null
+        fi
         
         if "$SUDO" cloudflared service install "$token"; then
             echo -e "${GREEN}✅ 配置成功！服务已自动启动。${NC}"
@@ -250,11 +267,10 @@ view_logs() {
 # 更新管理脚本
 update_script() {
     echo -e "${BLUE}正在从 GitHub 获取最新版管理脚本...${NC}"
-    local script_url="https://raw.githubusercontent.com/broykren666/CFTunnel-mg/refs/heads/main/cft.sh"
     local tmp_file
     tmp_file=$(mktemp)
     
-    if ! curl -sL -o "$tmp_file" "$script_url"; then
+    if ! curl -sL -o "$tmp_file" "$SCRIPT_URL"; then
         echo -e "${RED}下载失败！请检查服务器网络能否访问 Github。${NC}"
         rm -f "$tmp_file"
         read -n 1 -s -r -p "按任意键继续..."
