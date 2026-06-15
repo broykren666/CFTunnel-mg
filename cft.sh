@@ -31,14 +31,17 @@ fi
 # ==========================================
 # 自动添加全局快捷命令
 # ==========================================
-SCRIPT_PATH=$(readlink -f "$0")
-if [[ "$SCRIPT_PATH" != "/usr/local/bin/cft" && -f "$SCRIPT_PATH" ]]; then
-    if $SUDO cp -f "$SCRIPT_PATH" /usr/local/bin/cft 2>/dev/null; then
-        $SUDO chmod +x /usr/local/bin/cft
-        echo -e "${GREEN}✅ 已为您创建全局快捷命令！下次可在终端任意位置直接输入 ${BLUE}cft${GREEN} 打开本面板。${NC}"
-        sleep 2
+install_shortcut() {
+    local script_path
+    script_path=$(readlink -f "$0")
+    if [[ "$script_path" != "/usr/local/bin/cft" && -f "$script_path" ]]; then
+        if "$SUDO" cp -f "$script_path" /usr/local/bin/cft 2>/dev/null; then
+            "$SUDO" chmod +x /usr/local/bin/cft
+            echo -e "${GREEN}✅ 已为您创建全局快捷命令！下次可在终端任意位置直接输入 ${BLUE}cft${GREEN} 打开本面板。${NC}"
+            sleep 1
+        fi
     fi
-fi
+}
 
 # 获取隧道状态
 get_status() {
@@ -58,25 +61,40 @@ get_status() {
 
 # 安装 cloudflared
 install_cloudflared() {
-    echo -e "${BLUE}正在安装 cloudflared...${NC}"
-    ARCH=$(uname -m)
-    if [[ "$ARCH" == "x86_64" ]]; then
-        FILE="cloudflared-linux-amd64"
-    elif [[ "$ARCH" == "aarch64" ]]; then
-        FILE="cloudflared-linux-arm64"
-    else
-        FILE="cloudflared-linux-386"
-    fi
-    if ! curl -L -o cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/$FILE"; then
+    echo -e "${BLUE}正在识别系统架构...${NC}"
+    local arch file
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)          file="cloudflared-linux-amd64" ;;
+        aarch64|arm64)   file="cloudflared-linux-arm64" ;;
+        armv7l|armv6l)   file="cloudflared-linux-arm" ;;
+        i386|i686)       file="cloudflared-linux-386" ;;
+        *)
+            echo -e "${RED}错误：暂不支持的架构 $arch。请手动下载对应版本。${NC}"
+            read -n 1 -s -r -p "按任意键继续..."
+            return
+            ;;
+    esac
+
+    echo -e "${BLUE}正在下载 cloudflared ($arch)...${NC}"
+    if ! curl -L -o cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/$file"; then
         echo -e "${RED}下载失败！请检查服务器网络能否访问 Github。${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
         return
     fi
+
     chmod +x cloudflared
     if [[ -n "$SUDO" ]]; then
-        $SUDO mv cloudflared /usr/local/bin/
+        "$SUDO" mv -f cloudflared /usr/local/bin/
     else
-        mv cloudflared $HOME/bin/ 2>/dev/null || mv cloudflared /usr/local/bin/
+        # 尝试安装到用户 bin 目录并提醒
+        mkdir -p "$HOME/bin"
+        mv -f cloudflared "$HOME/bin/"
+        if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
+            echo -e "${YELLOW}警告：$HOME/bin 不在 PATH 中，您可能无法直接运行 cloudflared。${NC}"
+        fi
     fi
+
     echo -e "${GREEN}安装尝试完成！${NC}"
     echo -e "${YELLOW}提示：软件已安装。接下来请执行菜单 [选项 4] 来配置您的 Token 并启用隧道服务。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
@@ -88,7 +106,7 @@ update_cloudflared() {
         echo -e "${RED}未安装 cloudflared。${NC}"
     else
         echo -e "${BLUE}正在更新 cloudflared...${NC}"
-        $SUDO cloudflared update
+        "$SUDO" cloudflared update
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -106,24 +124,19 @@ uninstall_cloudflared() {
     echo -e "${RED}正在卸载 cloudflared...${NC}"
     if command -v cloudflared &> /dev/null; then
         echo -e "${YELLOW}正在注销系统服务...${NC}"
-        $SUDO cloudflared service uninstall 2>/dev/null
+        "$SUDO" cloudflared service uninstall 2>/dev/null
         if command -v systemctl &> /dev/null; then
-            $SUDO systemctl daemon-reload
+            "$SUDO" systemctl daemon-reload
         fi
     fi
     
-    if [[ -n "$SUDO" ]]; then
-        $SUDO rm -f /usr/local/bin/cloudflared
-        $SUDO rm -rf /etc/cloudflared
-    else
-        rm -f /usr/local/bin/cloudflared
-        rm -rf /etc/cloudflared
-    fi
+    "$SUDO" rm -f /usr/local/bin/cloudflared
+    "$SUDO" rm -rf /etc/cloudflared
     echo -e "${GREEN}卸载完成！程序和相关配置已清理。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# 配置并启动隧道服务 (Token 输入加密)
+# 配置并启动隧道服务
 configure_token() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}错误：请先安装 cloudflared (选项 1)${NC}"
@@ -131,15 +144,15 @@ configure_token() {
         return
     fi
 
-    # 兼容检查：是否已有配置的服务或正在运行的进程
-    SERVICE_EXISTS=false
+    # 兼容检查
+    local service_exists=false
     if command -v systemctl &> /dev/null && systemctl list-unit-files | grep -q cloudflared.service; then
-        SERVICE_EXISTS=true
+        service_exists=true
     elif [[ -f "/etc/init.d/cloudflared" ]] || pgrep -x "cloudflared" > /dev/null; then
-        SERVICE_EXISTS=true
+        service_exists=true
     fi
 
-    if [[ "$SERVICE_EXISTS" == true ]]; then
+    if [[ "$service_exists" == true ]]; then
         echo -e "${YELLOW}警告：检测到系统已配置了 Cloudflare Tunnel 服务或有正在运行的进程。${NC}"
         read -p "继续操作将覆盖现有配置并重启服务。是否确认继续？[y/N]: " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -151,22 +164,25 @@ configure_token() {
 
     echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时不会显示字符):${NC}"
     read -s -p "> " token
-    echo "" # 换行
+    echo "" 
     if [[ -z "$token" ]]; then
         echo -e "${RED}Token 不能为空！${NC}"
     else
         echo -e "${BLUE}正在配置隧道服务...${NC}"
-        if [[ "$SERVICE_EXISTS" == true ]]; then
-            $SUDO cloudflared service uninstall 2>/dev/null
-            $SUDO pkill -x cloudflared 2>/dev/null # 确保彻底杀死残留旧进程
+        # 先清理旧服务确保安装成功
+        "$SUDO" cloudflared service uninstall 2>/dev/null
+        "$SUDO" pkill -x cloudflared 2>/dev/null
+        
+        if "$SUDO" cloudflared service install "$token"; then
+            echo -e "${GREEN}✅ 配置成功！服务已自动启动。${NC}"
+        else
+            echo -e "${RED}❌ 配置失败，请检查上方报错信息。${NC}"
         fi
-        $SUDO cloudflared service install "$token"
-        echo -e "${GREEN}配置完成！请检查上方输出。${NC}"
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
 
-# 服务管理 (启动/停止/重启)
+# 服务管理
 manage_service() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}错误：请先安装 cloudflared${NC}"
@@ -181,18 +197,22 @@ manage_service() {
     echo " 0. 返回主菜单"
     read -p " 请选择 [0-3]: " s_choice
 
+    local cmd=""
     case $s_choice in
-        1)
-            $SUDO systemctl start cloudflared
-            ;;
-        2)
-            $SUDO systemctl stop cloudflared
-            ;;
-        3)
-            $SUDO systemctl restart cloudflared
-            ;;
+        1) cmd="start" ;;
+        2) cmd="stop" ;;
+        3) cmd="restart" ;;
         *) return ;;
     esac
+
+    if command -v systemctl &> /dev/null; then
+        "$SUDO" systemctl "$cmd" cloudflared
+    elif command -v service &> /dev/null; then
+        "$SUDO" service cloudflared "$cmd"
+    else
+        echo -e "${RED}错误：未找到 systemctl 或 service 命令，无法管理服务。${NC}"
+    fi
+    
     echo -e "${GREEN}操作已执行。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -201,29 +221,27 @@ manage_service() {
 view_logs() {
     echo -e "${BLUE}正在调取实时日志 (按 Ctrl+C 退出)...${NC}"
     if command -v journalctl &> /dev/null; then
-        $SUDO journalctl -u cloudflared -f -n 50
+        "$SUDO" journalctl -u cloudflared -f -n 50
     else
-        # 兼容 NAT VPS (如 OpenVZ/LXC) 等没有 systemd/journalctl 的情况
-        LOG_FILES=("/var/log/cloudflared.log" "/var/log/cloudflared.err" "/var/log/daemon.log" "/var/log/syslog" "/var/log/messages")
-        FOUND_LOG=""
-        for log in "${LOG_FILES[@]}"; do
+        local log_files=("/var/log/cloudflared.log" "/var/log/cloudflared.err" "/var/log/daemon.log" "/var/log/syslog" "/var/log/messages")
+        local found_log=""
+        for log in "${log_files[@]}"; do
             if [[ -f "$log" ]]; then
-                FOUND_LOG="$log"
+                found_log="$log"
                 break
             fi
         done
         
-        if [[ -n "$FOUND_LOG" ]]; then
-            echo -e "${YELLOW}未找到 journalctl，正在降级查看 $FOUND_LOG ...${NC}"
-            if [[ "$FOUND_LOG" == "/var/log/cloudflared."* ]]; then
-                $SUDO tail -f "$FOUND_LOG"
+        if [[ -n "$found_log" ]]; then
+            echo -e "${YELLOW}未找到 journalctl，正在降级查看 $found_log ...${NC}"
+            if [[ "$found_log" == "/var/log/cloudflared."* ]]; then
+                "$SUDO" tail -f "$found_log"
             else
-                # 系统混合日志，需要过滤 cloudflared 关键词
-                $SUDO tail -f -n 50 "$FOUND_LOG" | grep --line-buffered -i "cloudflared"
+                "$SUDO" tail -f -n 50 "$found_log" | grep --line-buffered -i "cloudflared"
             fi
         else
             echo -e "${RED}未找到 journalctl，也未找到默认的系统日志文件。${NC}"
-            echo -e "${YELLOW}若一直连不上，可手动执行尝试：cloudflared tunnel --no-autoupdate run --token <您的Token>${NC}"
+            echo -e "${YELLOW}提示：您可以尝试手动运行查看报错：cloudflared tunnel run --token <您的Token>${NC}"
             read -n 1 -s -r -p "按任意键继续..."
         fi
     fi
@@ -232,31 +250,43 @@ view_logs() {
 # 更新管理脚本
 update_script() {
     echo -e "${BLUE}正在从 GitHub 获取最新版管理脚本...${NC}"
-    SCRIPT_URL="https://raw.githubusercontent.com/broykren666/CFTunnel-mg/refs/heads/main/cft.sh"
+    local script_url="https://raw.githubusercontent.com/broykren666/CFTunnel-mg/refs/heads/main/cft.sh"
+    local tmp_file
+    tmp_file=$(mktemp)
     
-    TMP_FILE=$(mktemp)
-    if ! curl -sL -o "$TMP_FILE" "$SCRIPT_URL"; then
+    if ! curl -sL -o "$tmp_file" "$script_url"; then
         echo -e "${RED}下载失败！请检查服务器网络能否访问 Github。${NC}"
-        rm -f "$TMP_FILE"
+        rm -f "$tmp_file"
         read -n 1 -s -r -p "按任意键继续..."
         return
     fi
     
-    SCRIPT_PATH=$(readlink -f "$0")
-    $SUDO cp -f "$TMP_FILE" "$SCRIPT_PATH"
-    $SUDO chmod +x "$SCRIPT_PATH"
-    rm -f "$TMP_FILE"
+    local script_path
+    script_path=$(readlink -f "$0")
     
-    if [[ -f "/usr/local/bin/cft" && "$SCRIPT_PATH" != "/usr/local/bin/cft" ]]; then
-        $SUDO cp -f "$SCRIPT_PATH" /usr/local/bin/cft
-        $SUDO chmod +x /usr/local/bin/cft
+    # 覆盖当前脚本
+    if "$SUDO" cp -f "$tmp_file" "$script_path"; then
+        "$SUDO" chmod +x "$script_path"
+        
+        # 同时更新全局命令
+        if [[ -f "/usr/local/bin/cft" ]]; then
+            "$SUDO" cp -f "$script_path" /usr/local/bin/cft
+        fi
+        
+        echo -e "${GREEN}✅ 管理脚本已成功更新到最新版本！${NC}"
+        echo -e "${YELLOW}自动重启生效...${NC}"
+        sleep 1
+        rm -f "$tmp_file"
+        exec "$script_path"
+    else
+        echo -e "${RED}覆盖失败，请检查权限。${NC}"
+        rm -f "$tmp_file"
+        read -n 1 -s -r -p "按任意键继续..."
     fi
-    
-    echo -e "${GREEN}✅ 管理脚本已成功更新到最新版本！${NC}"
-    echo -e "${YELLOW}自动重启生效...${NC}"
-    sleep 1
-    exec "$SCRIPT_PATH"
 }
+
+# 运行初始化
+install_shortcut
 
 # 主菜单
 while true; do
@@ -277,7 +307,7 @@ while true; do
     echo " 0. 退出脚本"
     echo "------------------------------------------------------"
     read -p " 请选择一个选项 [0-7]: " choice
-    case $choice in
+    case "$choice" in
         1) install_cloudflared ;;
         2) update_cloudflared ;;
         3) uninstall_cloudflared ;;
