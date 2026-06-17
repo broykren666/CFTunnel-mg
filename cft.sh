@@ -175,9 +175,9 @@ configure_token() {
         fi
     fi
 
-    echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时不会显示字符):${NC}"
-    read -s -p "> " token
-    echo "" 
+    echo -e "${BLUE}请输入您的 Cloudflare Tunnel Token (输入时将明文显示):${NC}"
+    read -p "> " token
+    echo ""
     if [[ -z "$token" ]]; then
         echo -e "${RED}Token 不能为空！${NC}"
     else
