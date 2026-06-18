@@ -150,12 +150,14 @@ uninstall_cloudflared() {
         $SUDO kill -9 $(pgrep -x cloudflared) 2>/dev/null
     fi
 
-    # 清理程序和所有可能的配置目录
+    # 清理程序、快捷方式和所有可能的配置目录
     $SUDO rm -f /usr/local/bin/cloudflared
+    $SUDO rm -f /usr/local/bin/cft
+    $SUDO rm -f "$HOME/bin/cloudflared"
     $SUDO rm -rf /etc/cloudflared
-    rm -rf "$HOME/.cloudflared" # 增加用户家目录清理
+    rm -rf "$HOME/.cloudflared"
     
-    echo -e "${GREEN}卸载完成！程序和相关配置已清理。${NC}"
+    echo -e "${GREEN}卸载完成！程序、全局快捷键 (cft) 和相关配置已完全清理。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
 
