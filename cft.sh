@@ -238,9 +238,24 @@ manage_service() {
         $SUDO service cloudflared "$cmd"
     else
         echo -e "${RED}错误：未找到 systemctl 或 service 命令，无法管理服务。${NC}"
+        read -n 1 -s -r -p "按任意键继续..."
+        return
     fi
     
-    echo -e "${GREEN}操作已执行。${NC}"
+    # 检查操作后的状态并反馈
+    echo -n "正在确认状态... "
+    sleep 1
+    local final_status
+    if command -v systemctl &> /dev/null && systemctl is-active --quiet cloudflared 2>/dev/null; then
+        final_status="${GREEN}运行中 (Active)${NC}"
+    elif pgrep -x "cloudflared" > /dev/null; then
+        final_status="${GREEN}运行中 (Active)${NC}"
+    else
+        final_status="${RED}已停止 (Inactive)${NC}"
+    fi
+    echo -e "当前状态: $final_status"
+    
+    echo -e "${GREEN}操作执行完毕。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
 
