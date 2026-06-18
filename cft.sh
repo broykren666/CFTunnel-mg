@@ -333,10 +333,11 @@ install_shortcut
 while true; do
     clear
     STATUS=$(get_status)
+    VERSION=$(cloudflared --version 2>/dev/null | awk '{print $3}')
     echo "======================================================"
     echo "          Cloudflare Tunnel 隧道管理脚本"
     echo "------------------------------------------------------"
-    echo -e " 服务状态: $STATUS"
+    echo -e " 服务状态: $STATUS    当前版本: ${BLUE}${VERSION:-未知}${NC}"
     echo "======================================================"
     echo " 1. 安装 cloudflared"
     echo " 2. 更新 cloudflared"
