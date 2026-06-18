@@ -99,6 +99,9 @@ install_cloudflared() {
     fi
 
     echo -e "${GREEN}安装尝试完成！${NC}"
+    local installed_version
+    installed_version=$(cloudflared --version 2>/dev/null | awk '{print $3}')
+    echo -e "当前安装版本: ${GREEN}${installed_version:-未知}${NC}"
     echo -e "${YELLOW}提示：软件已安装。接下来请执行菜单 [选项 4] 来配置您的 Token 并启用隧道服务。${NC}"
     read -n 1 -s -r -p "按任意键继续..."
 }
@@ -108,8 +111,15 @@ update_cloudflared() {
     if ! command -v cloudflared &> /dev/null; then
         echo -e "${RED}未安装 cloudflared。${NC}"
     else
-        echo -e "${BLUE}正在更新 cloudflared...${NC}"
+        local current_version
+        current_version=$(cloudflared --version 2>/dev/null | awk '{print $3}')
+        echo -e "${BLUE}正在更新 cloudflared (当前版本: ${current_version:-未知})...${NC}"
+        
         $SUDO cloudflared update
+        
+        local new_version
+        new_version=$(cloudflared --version 2>/dev/null | awk '{print $3}')
+        echo -e "${GREEN}更新操作完成。当前版本: ${new_version:-未知}${NC}"
     fi
     read -n 1 -s -r -p "按任意键继续..."
 }
